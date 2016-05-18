@@ -85,7 +85,6 @@ module Optcarrot
     # icon data
     def icon_data
       width, height = 16, 16
-      pixels = FFI::MemoryPointer.new(:uint8, width * height * 4)
 
       palette = [
         0x00000000, 0xff0026ff, 0xff002cda, 0xff004000, 0xff0050ff, 0xff006000, 0xff007aff, 0xff00a000, 0xff00a4ff,
@@ -98,7 +97,7 @@ module Optcarrot
       end
       dat = dat.bytes.map {|clr| palette[clr - 35] }
 
-      return width, height, pixels.write_string(dat.pack("V*"))
+      return width, height, pixels = dat.pack("V*")
     end
   end
 end

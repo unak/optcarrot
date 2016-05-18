@@ -12,14 +12,14 @@ module Optcarrot
       # we need to prevent this callback object from GC
       @callback = SDL2.AudioCallback(method(:callback))
 
-      desired = SDL2::AudioSpec.new
-      desired[:freq] = @rate
-      desired[:format] = FORMAT[@bits]
-      desired[:channels] = 1
-      desired[:samples] = @rate / 60 * 2
-      desired[:callback] = defined?(SDL2.QueueAudio) ? nil : @callback
-      desired[:userdata] = nil
-      obtained = SDL2::AudioSpec.new
+      desired = SDL2::AudioSpec.malloc
+      desired.freq = @rate
+      desired.format = FORMAT[@bits]
+      desired.channels = 1
+      desired.samples = @rate / 60 * 2
+      desired.callback = defined?(SDL2.QueueAudio) ? nil : @callback
+      desired.userdata = nil
+      obtained = SDL2::AudioSpec.malloc
       @dev = SDL2.OpenAudioDevice(nil, 0, desired, obtained, 0)
       if @dev == 0
         @conf.error("SDL2_OpenAudioDevice failed: #{ SDL2.GetError }")
@@ -46,7 +46,7 @@ module Optcarrot
 
     # for SDL 2.0.3 or below in that SDL_QueueAudio is not available
     def callback(_userdata, stream, stream_len)
-      buff_size = @buff.size
+      buff_size = @buff.bytesize
       if stream_len > buff_size
         # stream.clear # is it okay?
         stream.write_string_length(@buff, buff_size)

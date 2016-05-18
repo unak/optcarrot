@@ -1,19 +1,40 @@
-require "ffi"
+require "fiddle/import"
 
 module Optcarrot
   # A minimal binding for SDL2
   module SDL2
-    extend FFI::Library
-    ffi_lib "SDL2"
+    extend Fiddle::Importer
+    dlload "SDL2"
+    typealias "int16", "short"
+    typealias "int32", "int"
+    typealias "pointer", "void *"
+    typealias "string", "void *"
+    typealias "uint8", "unsigned char"
+    typealias "uint16", "unsigned short"
+    typealias "uint32", "unsigned int"
+
+    def self.layout(*params)
+      klass = struct(params.enum_for(:each_slice, 2).map{|name, type| "#{type} #{name}"})
+      def klass.ptr
+        :pointer
+      end
+      klass
+    end
+
+    def self.attach_function(name, func, params, ret, blocking: false)
+      extern "#{ret.to_s} #{func}(#{params.map(&:to_s).join(', ')})"
+      define_singleton_method(name) do |*args|
+        method(func).(*args)
+      end
+    end
 
     # struct SDL_Version
-    class Version < FFI::Struct
+    Version =
       layout(
         :major, :uint8,
         :minor, :uint8,
         :patch, :uint8,
       )
-    end
 
     INIT_TIMER    = 0x00000001
     INIT_AUDIO    = 0x00000010
@@ -36,10 +57,9 @@ module Optcarrot
     WINDOW_MOUSE_FOCUS        = 0x00000400
     WINDOW_FULLSCREEN_DESKTOP = (WINDOW_FULLSCREEN | 0x00001000)
 
-    pixels = FFI::MemoryPointer.new(:uint32)
-    pixels.write_int32(0x04030201)
+    pixels = [0x04030201].pack('l')
     PACKEDORDER =
-      case pixels.read_bytes(4).unpack("C*")
+      case pixels.unpack("C*")
       when [1, 2, 3, 4] then 3 # PACKEDORDER_ARGB
       when [4, 3, 2, 1] then 8 # PACKEDORDER_BGRA
       else
@@ -59,7 +79,7 @@ module Optcarrot
     # Input
 
     # struct SDL_KeyboardEvent
-    class KeyboardEvent < FFI::Struct
+    KeyboardEvent =
       layout(
         :type, :uint32,
         :timestamp, :uint32,
@@ -71,10 +91,9 @@ module Optcarrot
         :scancode, :int,
         :sym, :int,
       )
-    end
 
     # struct SDL_JoyAxisEvent
-    class JoyAxisEvent < FFI::Struct
+    JoyAxisEvent =
       layout(
         :type, :uint32,
         :timestamp, :uint32,
@@ -86,10 +105,9 @@ module Optcarrot
         :value, :int16,
         :padding4, :uint16,
       )
-    end
 
     # struct SDL_JoyButtonEvent
-    class JoyButtonEvent < FFI::Struct
+    JoyButtonEvent =
       layout(
         :type, :uint32,
         :timestamp, :uint32,
@@ -99,16 +117,14 @@ module Optcarrot
         :padding1, :uint8,
         :padding2, :uint8,
       )
-    end
 
     # struct SDL_JoyDeviceEvent
-    class JoyDeviceEvent < FFI::Struct
+    JoyDeviceEvent =
       layout(
         :type, :uint32,
         :timestamp, :uint32,
         :which, :int32,
       )
-    end
 
     # Audio
 
@@ -116,10 +132,9 @@ module Optcarrot
     AUDIO_S16LSB = 0x8010
     AUDIO_S16MSB = 0x9010
 
-    pixels = FFI::MemoryPointer.new(:uint16)
-    pixels.write_int16(0x0201)
+    pixels = [0x0201].pack('s')
     AUDIO_S16SYS =
-      case pixels.read_bytes(2).unpack("C*")
+      case pixels.unpack("C*")
       when [1, 2] then AUDIO_S16LSB
       when [2, 1] then AUDIO_S16MSB
       else
@@ -127,7 +142,7 @@ module Optcarrot
       end
 
     # struct SDL_AudioSpec
-    class AudioSpec < FFI::Struct
+    AudioSpec =
       layout(
         :freq, :int,
         :format, :uint16,
@@ -139,11 +154,10 @@ module Optcarrot
         :callback, :pointer,
         :userdata, :pointer,
       )
-    end
 
     # rubocop:disable Style/MethodName
     def self.AudioCallback(blk)
-      FFI::Function.new(:void, [:pointer, :pointer, :int], blk)
+      bind("void callback(void *, void *, int)", &blk)
     end
     # rubocop:enable Style/MethodName
 
@@ -197,9 +211,9 @@ module Optcarrot
     # check SDL version
 
     attach_function(:GetVersion, :SDL_GetVersion, [:pointer], :void)
-    version = Version.new
+    version = Version.malloc
     GetVersion(version)
-    version = [version[:major], version[:minor], version[:patch]]
+    version = [version.major, version.minor, version.patch]
     if (version <=> [2, 0, 4]) < 0
       functions.delete(:QueueAudio)
       functions.delete(:GetQueuedAudioSize)

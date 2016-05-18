@@ -1,18 +1,12 @@
 require_relative "sdl2"
+require "fiddle/pointer"
 
 module Optcarrot
   # Input driver for SDL2
   class SDL2Input < Input
     def init
       SDL2.InitSubSystem(SDL2::INIT_JOYSTICK)
-      @event = FFI::MemoryPointer.new(:uint32, 16)
-
-      @keyboard_repeat_offset = SDL2::KeyboardEvent.offset_of(:repeat)
-      @keyboard_sym_offset = SDL2::KeyboardEvent.offset_of(:sym)
-      @joy_which_offset = SDL2::JoyAxisEvent.offset_of(:which)
-      @joyaxis_axis_offset = SDL2::JoyAxisEvent.offset_of(:axis)
-      @joyaxis_value_offset = SDL2::JoyAxisEvent.offset_of(:value)
-      @joybutton_button_offset = SDL2::JoyButtonEvent.offset_of(:button)
+      @event = [0].pack('S') * 16
 
       @joysticks = {}
       SDL2.NumJoysticks.times do |i|
@@ -85,36 +79,37 @@ module Optcarrot
 
     def tick(_frame, pads)
       while SDL2.PollEvent(@event) != 0
-        case @event.read_int
+        event = SDL2::JoyButtonEvent.new(@event.to_ptr)
+        case event.type
 
         when 0x300, 0x301 # SDL_KEYDOWN, SDL_KEYUP
-          next if @event.get_uint8(@keyboard_repeat_offset) != 0
-          key = @key_mapping[@event.get_int(@keyboard_sym_offset)]
-          event(pads, @event.read_int == 0x300 ? :keydown : :keyup, *key) if key
+          next if event.repeat != 0
+          key = @key_mapping[event.sym]
+          event(pads, event.read_int == 0x300 ? :keydown : :keyup, *key) if key
 
         when 0x600 # SDL_JOYAXISMOTION
-          which = @event.get_uint32(@joy_which_offset)
+          which = event.joy_which
           if which == 0 # XXX
-            axis = @event.get_uint8(@joyaxis_axis_offset) == 0
-            value = @event.get_int16(@joyaxis_value_offset)
+            axis = event.joyaxis_axis == 0
+            value = event.joyaxis_value
             joystick_move(axis, value, pads)
           end
 
         when 0x603 # SDL_JOYBUTTONDOWN
-          which = @event.get_uint32(@joy_which_offset)
-          joystick_buttondown(@event.get_uint8(@joybutton_button_offset), pads)
+          which = event.joy_which
+          joystick_buttondown(event.joybutton_button, pads)
 
         when 0x604 # SDL_JOYBUTTONUP
-          which = @event.get_uint32(@joy_which_offset)
-          joystick_buttonup(@event.get_uint8(@joybutton_button_offset), pads)
+          which = event.joy_which
+          joystick_buttonup(event.joybutton_button, pads)
 
         when 0x605 # SDL_JOYDEVICEADDED
-          which = @event.get_uint32(@joy_which_offset)
+          which = event.joy_which
           js = SDL2.JoystickOpen(which)
           @joysticks[SDL2.JoystickInstanceID(js)] = js
 
         when 0x606 # SDL_JOYDEVICEREMOVED
-          which = @event.get_uint32(@joy_which_offset)
+          which = event.joy_which
           @joysticks.delete(which)
 
         when 0x100 # SDL_QUIT

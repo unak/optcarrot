@@ -7,7 +7,6 @@ module Optcarrot
     def init
       SDL2.InitSubSystem(SDL2::INIT_VIDEO)
       @ticks_log = [0] * 11
-      @buf = FFI::MemoryPointer.new(:uint32, WIDTH * HEIGHT)
       @titles = (0..99).map {|n| "optcarrot (%d fps)" % n }
 
       @window =
@@ -73,7 +72,7 @@ module Optcarrot
       Driver.cutoff_overscan(colors)
       Driver.show_fps(colors, fps, @palette) if @conf.show_fps
 
-      @buf.write_array_of_uint32(colors)
+      @buf = colors.pack("L*")
 
       SDL2.UpdateTexture(@texture, nil, @buf, WIDTH * 4)
       SDL2.RenderClear(@renderer)

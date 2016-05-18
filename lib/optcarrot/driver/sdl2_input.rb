@@ -1,5 +1,4 @@
 require_relative "sdl2"
-require "fiddle/pointer"
 
 module Optcarrot
   # Input driver for SDL2
@@ -79,37 +78,40 @@ module Optcarrot
 
     def tick(_frame, pads)
       while SDL2.PollEvent(@event) != 0
-        event = SDL2::JoyButtonEvent.new(@event.to_ptr)
+        event = SDL2::JoyDeviceEvent.new(Fiddle::Pointer.to_ptr(@event))
+        keyevent = SDL2::KeyboardEvent.new(Fiddle::Pointer.to_ptr(@event))
+        axisevent = SDL2::JoyAxisEvent.new(Fiddle::Pointer.to_ptr(@event))
+        buttonevent = SDL2::JoyButtonEvent.new(Fiddle::Pointer.to_ptr(@event))
         case event.type
 
         when 0x300, 0x301 # SDL_KEYDOWN, SDL_KEYUP
-          next if event.repeat != 0
-          key = @key_mapping[event.sym]
-          event(pads, event.read_int == 0x300 ? :keydown : :keyup, *key) if key
+          next if keyevent.repeat != 0
+          key = @key_mapping[keyevent.sym]
+          event(pads, event.type == 0x300 ? :keydown : :keyup, *key) if key
 
         when 0x600 # SDL_JOYAXISMOTION
-          which = event.joy_which
+          which = axisevent.which
           if which == 0 # XXX
-            axis = event.joyaxis_axis == 0
-            value = event.joyaxis_value
+            axis = axisevent.axis == 0
+            value = axisevent.value
             joystick_move(axis, value, pads)
           end
 
         when 0x603 # SDL_JOYBUTTONDOWN
-          which = event.joy_which
-          joystick_buttondown(event.joybutton_button, pads)
+          which = buttonevent.which
+          joystick_buttondown(event.button, pads)
 
         when 0x604 # SDL_JOYBUTTONUP
-          which = event.joy_which
-          joystick_buttonup(event.joybutton_button, pads)
+          which = buttonevent.which
+          joystick_buttonup(event.button, pads)
 
         when 0x605 # SDL_JOYDEVICEADDED
-          which = event.joy_which
+          which = event.which
           js = SDL2.JoystickOpen(which)
           @joysticks[SDL2.JoystickInstanceID(js)] = js
 
         when 0x606 # SDL_JOYDEVICEREMOVED
-          which = event.joy_which
+          which = event.which
           @joysticks.delete(which)
 
         when 0x100 # SDL_QUIT

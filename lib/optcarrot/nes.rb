@@ -50,7 +50,7 @@ module Optcarrot
       @audio.tick(@apu.output)
 
       @frame += 1
-      @conf.info("frame #{ @frame }") if @conf.loglevel >= 2
+      @conf.debug("frame #{ @frame }") if @conf.loglevel >= 2
     end
 
     def dispose

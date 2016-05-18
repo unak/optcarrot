@@ -40,7 +40,7 @@ module Optcarrot
         klass = DRIVER_DB[type][name]
         raise "unknown #{ type } driver: #{ name }" unless klass
         require_relative "driver/#{ name }_#{ type }" unless name == :none
-        conf.debug("`#{ name }' #{ type } driver is selected")
+        conf.info("`#{ name }' #{ type } driver is selected")
         Optcarrot.const_get(klass)
       else
         selected = nil
@@ -49,7 +49,7 @@ module Optcarrot
             selected = load_each(conf, type, n)
             break
           rescue LoadError
-            conf.debug("fail to use `#{ n }' #{ type } driver")
+            conf.info("fail to use `#{ n }' #{ type } driver")
           end
         end
         selected
